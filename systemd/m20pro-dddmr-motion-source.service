@@ -1,0 +1,16 @@
+[Unit]
+Description=M20Pro DrDDS MotionInfo socket source
+BindsTo=m20pro-real.service
+After=m20pro-real.service
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/default/m20pro-real
+ExecCondition=/bin/bash -c 'case "${M20PRO_WORKSPACE_MODE:-3d}" in 3d) exit 0;; *) exit 1;; esac'
+ExecStart=/bin/bash -lc 'source /opt/robot/scripts/setup_ros2.sh && export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/robot/fastdds.xml && exec /usr/local/lib/m20pro/drdds_motion_info_socket_source /MOTION_INFO /run/m20pro/dddmr_motion_info.sock 0 0 rt'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=m20pro-real.service

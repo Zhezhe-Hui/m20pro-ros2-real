@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Offline contract tests for the single M20Pro field profile."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from pathlib import Path
+import sys
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src/m20pro_navigation"))
+
+from m20pro_navigation.field_profile_contract import (  # noqa: E402
+    FieldProfileError,
+    command_mux_field_parameters,
+    edge_environment,
+    load_field_profile,
+    render_edge_environment,
+    stair_executor_field_parameters,
+    validate_field_profile,
+    web_navigation_field_parameters,
+    web_teleoperation_field_parameters,
+)
+
+
+PROFILE_PATH = ROOT / "src/m20pro_bringup/config/m20pro_field_profile.yaml"
+
+
+def raw_profile() -> dict:
+    return yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
+
+
+def rejected(raw: dict) -> bool:
+    try:
+        validate_field_profile(raw)
+    except FieldProfileError:
+        return True
+    return False
+
+
+def leaf_count(value: object) -> int:
+    if isinstance(value, dict):
+        return sum(leaf_count(item) for item in value.values())
+    return 1
+
+
+def main() -> None:
+    profile = load_field_profile(PROFILE_PATH)
+    assert profile["profile_hash"] == load_field_profile(PROFILE_PATH)["profile_hash"]
+    assert len(profile["profile_hash"]) == 64
+    editable = {
+        key: raw_profile()[key]
+        for key in (
+            "scan",
+            "dddmr",
+            "stair_transition",
+            "navigation",
+            "teleoperation",
+            "localization",
+        )
+    }
+    assert leaf_count(editable) == 80
+    assert leaf_count(editable["navigation"]) == 30
+    assert leaf_count(editable["teleoperation"]) == 7
+
+    retired_stair_group = raw_profile()
+    retired_stair_group["stair"] = {"max_step_height_m": 0.24}
+    assert rejected(retired_stair_group)
+
+    unsafe_speed = raw_profile()
+    unsafe_speed["navigation"]["controller"]["stopped_linear_speed_mps"] = 0.50
+    assert rejected(unsafe_speed)
+
+    impossible_turning_range = raw_profile()
+    impossible_turning_range["navigation"]["controller"][
+        "min_angular_speed_radps"
+    ] = 0.80
+    assert rejected(impossible_turning_range)
+
+    unsafe_teleop = raw_profile()
+    unsafe_teleop["teleoperation"]["max_forward_speed_mps"] = 0.60
+    assert rejected(unsafe_teleop)
+
+    weak_teleop_watchdog = raw_profile()
+    weak_teleop_watchdog["teleoperation"]["watchdog_rate_hz"] = 10.0
+    weak_teleop_watchdog["teleoperation"]["command_timeout_s"] = 0.20
+    assert rejected(weak_teleop_watchdog)
+
+    impossible_costmap_rate = raw_profile()
+    impossible_costmap_rate["navigation"]["costmap"]["local_publish_frequency_hz"] = 10.0
+    impossible_costmap_rate["navigation"]["costmap"]["local_update_frequency_hz"] = 8.0
+    assert rejected(impossible_costmap_rate)
+
+    impossible_raytrace = raw_profile()
+    impossible_raytrace["navigation"]["costmap"]["raytrace_range_m"] = 2.0
+    impossible_raytrace["navigation"]["costmap"]["obstacle_range_m"] = 3.0
+    assert rejected(impossible_raytrace)
+
+    unsafe_localization = raw_profile()
+    unsafe_localization["localization"]["pose_jump_candidate_radius_m"] = 0.8
+    unsafe_localization["localization"]["pose_jump_reject_m"] = 0.6
+    assert rejected(unsafe_localization)
+
+    legacy_schema = raw_profile()
+    legacy_schema["schema_version"] = 5
+    assert rejected(legacy_schema)
+
+    changed = deepcopy(raw_profile())
+    changed["scan"]["height_min_m"] = -0.24
+    changed_profile = validate_field_profile(changed)
+    assert changed_profile["profile_hash"] != profile["profile_hash"]
+
+    environment = edge_environment(profile)
+    command_mux = command_mux_field_parameters(profile)
+    web_teleoperation = web_teleoperation_field_parameters(profile)
+    web_navigation = web_navigation_field_parameters(profile)
+    stair_executor = stair_executor_field_parameters(profile)
+    assert command_mux["teleop_max_lateral_speed_mps"] == 0.30
+    assert web_teleoperation["teleop_max_lateral_speed_mps"] == 0.30
+    assert web_navigation["goal_reached_tolerance_m"] == profile["navigation"]["goal"]["xy_tolerance_m"]
+    assert web_navigation["cross_floor_factory_apply_timeout_s"] == profile["stair_transition"]["floor_switch_timeout_s"]
+    assert web_navigation["cross_floor_platform_position_tolerance_m"] == profile["stair_transition"]["platform_position_tolerance_m"]
+    assert web_navigation["cross_floor_platform_yaw_tolerance_rad"] == profile["stair_transition"]["platform_yaw_tolerance_rad"]
+    assert stair_executor["motion_speed_mps"] == 0.12
+    assert stair_executor["platform_tolerance_m"] == profile["stair_transition"]["platform_position_tolerance_m"]
+    assert stair_executor["gait_settle_s"] == 1.0
+    assert stair_executor["post_switch_goal_delay_s"] == 0.2
+    rendered = render_edge_environment(profile)
+    assert not any(key.startswith("STAIR_") for key in environment)
+    assert len(environment) == 25
+    assert environment["DDDMR_EDGE_CLOUD_TOPIC"] == "/m20pro/edge_cloud"
+    assert float(environment["DDDMR_HEIGHT_MIN"]) < float(environment["HEIGHT_MIN"])
+    assert float(environment["DDDMR_HEIGHT_MAX"]) > float(environment["HEIGHT_MAX"])
+    assert int(environment["DDDMR_MAX_POINTS"]) == 20000
+    assert environment["FIELD_PROFILE_HASH"] == profile["profile_hash"]
+    assert rendered.count("FIELD_PROFILE_HASH=") == 1
+    assert "Do not edit this file" in rendered
+    assert not (
+        ROOT
+        / "tools/edge_scan_feasibility/service/m20pro-edge-scan-106.env.edge_scan"
+    ).exists()
+
+    print("single field profile contract tests passed")
+
+
+if __name__ == "__main__":
+    main()

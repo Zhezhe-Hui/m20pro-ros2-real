@@ -1,0 +1,84 @@
+# M20Pro raw lidar chain - rslidar_sdk config (runs on 104).
+#
+# 2026-08-20 root cause fix for 3D mapping distortion: the vendor
+# /LIDAR/POINTS stream attitude-levels the clouds (dynamic compensation,
+# contradicting the manual's static-extrinsics contract) and interleaves
+# merged + single-lidar frames.  This config instead parses the factory
+# raw MSOP packets that multicast.py (106, vendor multicast-relay role)
+# already forwards to the 31 segment, producing uncompensated rigid
+# XYZIRT clouds with true per-point PTP timestamps - exactly the input
+# Lightning-LM's IMU deskew expects.
+#
+# 2026-08-20 factory attitude trim (root cause of 3D map warping):
+# upstream rs_driver applies the yaml transform verbatim, while the vendor
+# node_driver binary (rs_driver v1.5.18 base, change_log v1.0.8 "修改雷达标定
+# 原点值") carries extra per-lidar mounting trim.  Measured on stationary
+# robot vs /IMU gravity (per_lidar_probe): front floor excess +1.06deg
+# fore-aft / -1.79deg lateral, rear -2.53deg / -0.47deg.  The trim below is
+# the nominal mount (yaw -180/0, pitch -90, roll 0) composed with that
+# correction; ZYX euler coupling near pitch=-90 makes the numbers look large
+# but the net rotation change is exactly the small measured trim.
+# Ports/groups mirror /opt/robot/share/node_driver/config/config.yaml on
+# AOS.  Extrinsics are the manual's static values (m20pro_manual_lidar.md):
+# front (+0.32028, pitch -90deg, yaw 180deg), rear (-0.32028, pitch -90deg).
+common:
+  msg_source: 1
+  send_packet_ros: false
+  send_point_cloud_ros: true
+  send_packet_proto: false
+  send_point_cloud_proto: false
+
+lidar:
+  - driver:
+      lidar_type: RSAIRY
+      # 106 的 multicast.py 以组播重转发原始包，104 必须入组才能收到；
+      # host_address 指定入组接口（eth0/31 段），避免走默认多播路由。
+      host_address: 10.21.31.104
+      group_address: 224.10.10.201
+      msop_port: 6691
+      difop_port: 7781
+      imu_port: 0
+      user_layer_bytes: 0
+      tail_layer_bytes: 0
+      min_distance: 0.2
+      max_distance: 60
+      use_lidar_clock: true
+      dense_points: true
+      ts_first_point: true
+      start_angle: 0
+      end_angle: 360
+      x: 0.32028
+      y: 0
+      z: -0.013
+      roll: -2.015908
+      pitch: -1.534566
+      yaw: -1.125627
+    ros:
+      ros_frame_id: lidar_link
+      ros_send_point_cloud_topic: /m20pro/raw_lidar_front
+
+  - driver:
+      lidar_type: RSAIRY
+      host_address: 10.21.31.104
+      group_address: 224.10.10.202
+      msop_port: 6692
+      difop_port: 7782
+      imu_port: 0
+      user_layer_bytes: 0
+      tail_layer_bytes: 0
+      min_distance: 0.2
+      max_distance: 60
+      use_lidar_clock: true
+      dense_points: true
+      ts_first_point: true
+      start_angle: 0
+      end_angle: 360
+      x: -0.32028
+      y: 0
+      z: -0.013
+      roll: -0.065596
+      pitch: -1.637840
+      yaw: 0.065773
+    ros:
+      ros_frame_id: lidar_link
+      ros_send_point_cloud_topic: /m20pro/raw_lidar_rear

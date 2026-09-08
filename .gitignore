@@ -1,0 +1,65 @@
+# ROS / colcon generated files
+build/
+install/
+log/
+devel/
+.colcon/
+dist/
+
+# Python cache and test output
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Local editor / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Runtime data, bags, point clouds, and model artifacts
+bags/
+task_watch_logs/
+*.bag
+*.db3
+*.mcap
+*.pcd
+!vendor/dddmr/lego_loam_bor/pcd/feature.pcd
+*.ply
+*.onnx
+*.engine
+*.rknn
+*.pt
+*.pth
+
+# Local raw map/session exports outside ROS packages
+/working_*/
+**/.blocks/
+**/.sessions/
+
+# Third-party reference workspace kept locally, not part of this project
+dddmr_navigation/
+/x30_core_nav_slam/
+
+# Local map editor/export metadata
+**/.optimizers/
+**/occ_grid_id_map.toml
+
+# Documents that may be copyrighted or private
+*.pdf
+
+# Local environment/secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Local M20 Pro project memory notes
+
+# Local WebRTC/TLS artifacts and test runner output
+auto.crt
+test-results/

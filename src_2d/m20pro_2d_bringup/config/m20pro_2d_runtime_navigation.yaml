@@ -1,0 +1,4 @@
+floors:
+  F20:
+    label: "2D development floor"
+    waypoints: []

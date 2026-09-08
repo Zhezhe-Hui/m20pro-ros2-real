@@ -1,0 +1,379 @@
+# M20Pro-specific DDDMR navigation parameters.
+#
+# This profile reuses M20Pro /odom and odom -> m20pro_base_link, while the
+# official DDDMR MCL owns map -> odom. Dynamic observations come only from the
+# validated 106 /dddmr/edge_cloud stream; static assets come from the
+# Lightning-LM archive through m20pro_dddmr_map_asset_server.
+
+# Official LeGO feature front-end, used only for localization features. It is
+# not started as a mapper: Lightning-LM remains the sole mapping algorithm.
+mcl_ip:
+  ros__parameters:
+    laser:
+      odom_type: "wheel_odometry"
+      base_ground_frame: "m20pro_base_link"
+      num_vertical_scans: 96
+      num_horizontal_scans: 1800
+      vertical_angle_bottom: -25.0
+      vertical_angle_top: 25.0
+      scan_period: 0.1
+    imageProjection:
+      segment_valid_point_num: 5
+      segment_valid_line_num: 2
+      segment_theta: 60.0
+      minimum_detection_range: 0.5
+      maximum_detection_range: 30.0
+      distance_for_patch_between_rings: 1.0
+      stitcher_num: 0
+      trt_model_path: ""
+      projected_image_stack_size: 1
+      ground_fov_bottom: -0.436332
+      ground_fov_top: -0.087266
+      ground_positive_start: 0.0
+      ground_positive_stop: 3.1415926
+      ground_negative_start: 0.0
+      ground_negative_stop: -3.1415926
+
+mcl_fa:
+  ros__parameters:
+    featureAssociation:
+      edge_threshold: 0.1
+      surf_threshold: 0.1
+      nearest_feature_search_distance: 3.0
+    mapping:
+      to_map_optimization: false
+
+# mcl_3dl gets its map1/key_poses and map1/get_key_frame_cloud interface from
+# the M20Pro Lightning archive adapter, not from a second mapper.
+sub_maps:
+  ros__parameters:
+    pg_map_server_name: "map1"
+    sub_map_search_radius: 20.0
+    sub_map_warmup_trigger_distance: 8.0
+
+mcl_3dl:
+  ros__parameters:
+    init_x: 0.0
+    init_y: 0.0
+    init_z: 0.0
+    init_roll: 0.0
+    init_pitch: 0.0
+    init_yaw: 0.0
+    init_var_x: 2.0
+    init_var_y: 2.0
+    init_var_z: 0.5
+    init_var_roll: 0.2
+    init_var_pitch: 0.2
+    init_var_yaw: 0.5
+    map_frame: "map"
+    robot_frame: "m20pro_base_link"
+    odom_frame: "odom"
+    map_downsample_x: 0.20
+    map_downsample_y: 0.20
+    map_downsample_z: 0.20
+    num_particles: 80
+    resample_var_x: 0.20
+    resample_var_y: 0.20
+    # 2026-09-01: 观测云无地面点(厂商过滤), z 方向似然约束弱, 粒子 z 会
+    # 塌缩(实测 -3.5m)。平地场景 z 运动极小, 收紧 z 方差锁住高度。
+    resample_var_z: 0.05
+    resample_var_yaw: 0.10
+    resample_var_pitch: 0.20
+    resample_var_roll: 0.20
+    expansion_var_x: 0.50
+    expansion_var_y: 0.50
+    expansion_var_z: 0.10
+    expansion_var_roll: 0.20
+    expansion_var_pitch: 0.20
+    expansion_var_yaw: 0.20
+    match_ratio_thresh: 0.0
+    euc_cluster_distance: 0.8
+    euc_cluster_min_size: 3
+    euc_cluster_max_size: 2400
+    knn_num_of_ground_normals: 20
+    update_min_d: 0.10
+    update_min_a: 0.10
+    odom_err_lin_lin: 0.60
+    odom_err_lin_ang: 0.30
+    odom_err_ang_lin: 0.30
+    odom_err_ang_ang: 0.60
+    odom_err_integ_lin_tc: 5.0
+    odom_err_integ_ang_tc: 10.0
+    lpf_step: 2.0
+    acc_lpf_step: 128.0
+    jump_dist: 1.0
+    jump_ang: 1.57
+    bias_var_dist: 2.0
+    bias_var_ang: 1.57
+    tf_tolerance: 0.10
+    publish_tf: true
+    likelihood:
+      num_points_global: 8
+      match_dist_min: 0.30
+      match_dist_flat: 0.05
+      # 2026-09-01: 地面先验(pos_weight)假设 base 贴近地面(原厂狗 base_link
+      # 离地近), M20Pro 的 base 离地 ~0.84m, 该先验把粒子系统性吸向地面
+      # (实测 z 塌缩到 -3.5)。设为极大值禁用地面加权分支, z 靠 odom+收紧的
+      # 粒子方差维持, xy/yaw 靠非地面通道与地图匹配。
+      threshold_for_trusted_ground: 100000
+      radius_of_ground_search: 1.0
+
+p2p_move_base:
+  ros__parameters:
+    use_sim_time: false
+    controller_frequency: 10.0
+    planner_patience: 10.0
+    oscillation_distance: 0.30
+    oscillation_angle: 0.50
+    oscillation_patience: 15.0
+    controller_patience: 10.0
+    no_plan_retry_num: 3
+    waiting_patience: 5.0
+
+global_plan_manager:
+  ros__parameters:
+    use_sim_time: false
+    global_planner_action_name: "get_dwa_plan"
+    global_plan_query_frequency: 2.0
+
+local_planner:
+  ros__parameters:
+    use_sim_time: false
+    odom_topic: "/odom"
+    forward_prune: 3.0
+    backward_prune: 1.0
+    heading_tracking_distance: 0.50
+    heading_align_angle: 0.50
+    prune_plane_timeout: 3.0
+    xy_goal_tolerance: 0.35
+    yaw_goal_tolerance: 0.35
+    controller_frequency: 10.0
+    cuboid:
+      flb: [0.40, 0.27, -0.30]
+      frb: [0.40, -0.27, -0.30]
+      flt: [0.40, 0.27, 0.45]
+      frt: [0.40, -0.27, 0.45]
+      blb: [-0.40, 0.27, -0.30]
+      brb: [-0.40, -0.27, -0.30]
+      blt: [-0.40, 0.27, 0.45]
+      brt: [-0.40, -0.27, 0.45]
+
+recovery_behaviors:
+  ros__parameters:
+    use_sim_time: false
+    plugins: ["rotate_inplace"]
+    rotate_inplace:
+      plugin: "recovery_behaviors::RotateInPlaceBehavior"
+      frequency: 10.0
+      tolerance: 0.35
+      trajectory_generator_name: "differential_drive_rotate_inplace"
+
+trajectory_generators:
+  ros__parameters:
+    use_sim_time: false
+    plugins:
+      - "differential_drive_simple"
+      - "differential_drive_rotate_inplace"
+      - "differential_drive_rotate_shortest_angle"
+    differential_drive_rotate_shortest_angle:
+      plugin: "trajectory_generators::DDRotateInplaceTheory"
+      controller_frequency: 10.0
+      rotation_speed: 0.35
+      cuboid:
+        flb: [0.40, 0.27, -0.30]
+        frb: [0.40, -0.27, -0.30]
+        flt: [0.40, 0.27, 0.45]
+        frt: [0.40, -0.27, 0.45]
+        blb: [-0.40, 0.27, -0.30]
+        brb: [-0.40, -0.27, -0.30]
+        blt: [-0.40, 0.27, 0.45]
+        brt: [-0.40, -0.27, 0.45]
+    differential_drive_rotate_inplace:
+      plugin: "trajectory_generators::DDRotateInplaceTheory"
+      controller_frequency: 10.0
+      rotation_speed: 0.35
+      cuboid:
+        flb: [0.40, 0.27, -0.30]
+        frb: [0.40, -0.27, -0.30]
+        flt: [0.40, 0.27, 0.45]
+        frt: [0.40, -0.27, 0.45]
+        blb: [-0.40, 0.27, -0.30]
+        brb: [-0.40, -0.27, -0.30]
+        blt: [-0.40, 0.27, 0.45]
+        brt: [-0.40, -0.27, 0.45]
+    differential_drive_simple:
+      plugin: "trajectory_generators::DDSimpleTrajectoryGeneratorTheory"
+      max_vel_x: 0.18
+      min_vel_x: 0.05
+      max_vel_theta: 0.45
+      min_vel_theta: 0.15
+      acc_lim_x: 0.60
+      acc_lim_theta: 1.20
+      deceleration_ratio: 1.5
+      max_motor_shaft_rpm: 3000.0
+      wheel_diameter: 0.16
+      gear_ratio: 1.0
+      robot_radius: 0.48
+      controller_frequency: 10.0
+      sim_time: 1.5
+      linear_x_sample: 8.0
+      angular_z_sample: 16.0
+      sim_granularity: 0.05
+      angular_sim_granularity: 0.025
+      cuboid:
+        flb: [0.40, 0.27, -0.30]
+        frb: [0.40, -0.27, -0.30]
+        flt: [0.40, 0.27, 0.45]
+        frt: [0.40, -0.27, 0.45]
+        blb: [-0.40, 0.27, -0.30]
+        brb: [-0.40, -0.27, -0.30]
+        blt: [-0.40, 0.27, 0.45]
+        brt: [-0.40, -0.27, 0.45]
+
+mpc_critics:
+  ros__parameters:
+    use_sim_time: false
+    plugins:
+      - "collision"
+      - "stick_path"
+      - "pure_pursuit"
+      - "toward_global_plan"
+      - "collision_rotate"
+      - "collision_rotate_shortest"
+      - "prefer_rotate_shortest"
+    collision:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: "differential_drive_simple"
+      weight: 1.0
+    stick_path:
+      plugin: "mpc_critics::StickPathModel"
+      trajectory_generator: "differential_drive_simple"
+      weight: 0.1
+    pure_pursuit:
+      plugin: "mpc_critics::PurePursuitModel"
+      trajectory_generator: "differential_drive_simple"
+      translation_weight: 1.0
+      orientation_weight: 0.01
+    toward_global_plan:
+      plugin: "mpc_critics::TowardGlobalPlanModel"
+      trajectory_generator: "differential_drive_simple"
+      weight: 1.0
+    collision_rotate:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: "differential_drive_rotate_inplace"
+      weight: 1.0
+    collision_rotate_shortest:
+      plugin: "mpc_critics::CollisionModel"
+      trajectory_generator: "differential_drive_rotate_shortest_angle"
+      weight: 1.0
+    prefer_rotate_shortest:
+      plugin: "mpc_critics::ShortestAngleModel"
+      trajectory_generator: "differential_drive_rotate_shortest_angle"
+      weight: 1.0
+
+perception_3d_local:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: "map"
+    robot_base_frame: "m20pro_base_link"
+    max_obstacle_distance: 30.0
+    inscribed_radius: 0.48
+    inflation_descending_rate: 3.0
+    inflation_radius: 0.70
+    sensors_collected_frequency: 10.0
+    plugins: ["map", "path_blocked_strategy", "lidar"]
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: true
+      mapping_mode: false
+      # Consume the native DDDMR pose-graph namespace. The M20Pro asset
+      # adapter also republishes this pair at /mapcloud and /mapground for the
+      # dashboard, but planner inputs stay on the upstream contract.
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+    path_blocked_strategy:
+      plugin: "perception_3d::PathBlockedStrategy"
+      check_radius: 0.48
+    lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: true
+      topic: "/dddmr/edge_cloud"
+      pub_gbl_marking_for_visualization: false
+      vertical_FOV_top: 90.0
+      vertical_FOV_bottom: -90.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: 0.0
+      scan_effective_negative_end: -180.0
+      xy_resolution: 0.08
+      height_resolution: 0.08
+      marking_height: 1.2
+      marking_minimum_height: -0.25
+      perception_window_size: 4.0
+      segmentation_ignore_ratio: 1.1
+      expected_sensor_time: 0.10
+      stitcher_num: 0
+
+perception_3d_global:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: "map"
+    robot_base_frame: "m20pro_base_link"
+    max_obstacle_distance: 30.0
+    inscribed_radius: 0.48
+    inflation_descending_rate: 3.0
+    inflation_radius: 0.70
+    sensors_collected_frequency: 10.0
+    plugins: ["map", "lidar"]
+    dgraph_publish_frequency: 1.0
+    map:
+      plugin: "perception_3d::StaticLayer"
+      is_local_planner: false
+      use_adaptive_connection: true
+      adaptive_connection_number: 20
+      radius_of_ground_connection: 1.2
+      intensity_search_radius: 1.0
+      intensity_search_punish_weight: 0.1
+      static_imposing_radius: 1.0
+      map_topic: "map1/mapcloud"
+      ground_topic: "map1/mapground"
+      support:
+        mapping_mode: false
+        enable_edge_detection: true
+        generate_static_graph: false
+    lidar:
+      plugin: "perception_3d::MultiLayerSpinningLidar"
+      is_local_planner: false
+      topic: "/dddmr/edge_cloud"
+      pub_gbl_marking_for_visualization: true
+      pub_gbl_marking_frequency: 1.0
+      vertical_FOV_top: 90.0
+      vertical_FOV_bottom: -90.0
+      scan_effective_positive_start: 0.0
+      scan_effective_positive_end: 180.0
+      scan_effective_negative_start: 0.0
+      scan_effective_negative_end: -180.0
+      euclidean_cluster_extraction_tolerance: 0.20
+      euclidean_cluster_extraction_min_cluster_size: 3
+      euclidean_cluster_minimum_accepted_size: 3
+      xy_resolution: 0.08
+      height_resolution: 0.08
+      marking_height: 1.2
+      marking_minimum_height: -0.25
+      perception_window_size: 6.0
+      segmentation_ignore_ratio: 1.1
+      expected_sensor_time: 0.10
+      stitcher_num: 0
+
+global_planner:
+  ros__parameters:
+    use_sim_time: false
+    turning_weight: 0.1
+    enable_detail_log: false
+    a_star_expanding_radius: 0.50
+
+dynamic_window_aware_global_planner:
+  ros__parameters:
+    use_sim_time: false
+    look_ahead_distance: 2.0
+    recompute_frequency: 2.0

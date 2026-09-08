@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rslidar_msg</name>
+  <version>1.0.0</version>
+  <description>RoboSense lidar packet message (local synthesis of RoboSense-LiDAR/rslidar_msg for offline builds; field layout matches rslidar_sdk v1.5.20 usage).</description>
+  <maintainer email="m20pro@local.dev">m20pro</maintainer>
+  <license>BSD</license>
+  <buildtool_depend condition="$ROS_VERSION == 2">ament_cmake</buildtool_depend>
+  <buildtool_depend condition="$ROS_VERSION == 2">rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <exec_depend condition="$ROS_VERSION == 2">rosidl_default_runtime</exec_depend>
+  <member_of_group condition="$ROS_VERSION == 2">rosidl_interface_packages</member_of_group>
+  <export>
+    <build_type condition="$ROS_VERSION == 2">ament_cmake</build_type>
+  </export>
+</package>

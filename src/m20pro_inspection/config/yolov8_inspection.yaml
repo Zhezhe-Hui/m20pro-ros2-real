@@ -1,0 +1,41 @@
+m20pro_yolov8_inspection:
+  ros__parameters:
+    # M20 Pro software manual RTSP camera streams:
+    #   front wide camera: rtsp://10.21.31.103:8554/video1
+    #   rear wide camera:  rtsp://10.21.31.103:8554/video2
+    source_type: "rtsp"  # rtsp or image_topic
+    rtsp_url: "rtsp://10.21.31.103:8554/video1"
+    image_topic: "/camera/image_raw"
+    camera_name: "front_wide"
+    enabled: false
+
+    # Compile best.pt on the x86_64 workstation; 104 runs only the RKNN artifact.
+    backend: "auto"  # auto, ultralytics, rknn, onnx, or dry_run
+    model_path: ""
+    class_names_path: ""
+    class_names: [""]
+    ultralytics_device: "cpu"
+
+    input_size: 640
+    conf_threshold: 0.35
+    iou_threshold: 0.45
+    output_has_objectness: false
+    max_detections: 100
+    # Keep the source H.264 stream at 30 fps; only NPU inference is capped at
+    # 3 Hz while YOLO is enabled so the robot and browser keep headroom.
+    publish_rate_hz: 3.0
+    reconnect_interval_s: 2.0
+
+    # The frontend overlays detection JSON on the original H.264 video. Do not
+    # serialize full ROS Image frames or start a second MJPEG video pipeline.
+    publish_annotated_image: false
+    publish_empty_detections: true
+    detections_topic: "~/detections"
+    annotated_image_topic: "~/annotated_image"
+    event_topic: "~/events"
+    status_topic: "~/status"
+
+    # Empty event_classes means every class can generate an event.
+    event_classes: [""]
+    event_conf_threshold: 0.60
+    event_min_interval_s: 2.0

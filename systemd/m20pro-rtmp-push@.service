@@ -1,0 +1,19 @@
+[Unit]
+Description=M20Pro RTMP push to cloud SRS (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+TimeoutStopSec=10
+Environment=RTMP_PUSH_BASE_URL=rtmp://47.104.5.77:1935/live
+EnvironmentFile=-/etc/m20pro-rtmp-push.env
+# TimeoutStopSec: a frozen ffmpeg must not hold the unit for 90s during
+# restart. Stall detection itself is done by the ECS-side SRS watchdog
+# (srs_stream_watchdog.sh); 104's ffmpeg is too old for -rw_timeout.
+ExecStart=/usr/bin/ffmpeg -hide_banner -loglevel warning -rtsp_transport tcp -fflags nobuffer -flags low_delay -stimeout 5000000 -i rtsp://10.21.31.103:8554/%i -an -c copy -f flv ${RTMP_PUSH_BASE_URL}/%i
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M20 Pro ROS 2 跨楼层巡检导航系统</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/static/dashboard.css?v=20260821-teleop-motion-keep-1" />
+
+</head>
+<body>
+  <header class="topbar">
+    <div class="top-brand"><strong>M20 Pro</strong><span>跨楼层巡检导航系统</span></div>
+    <div class="top-status">
+      <span class="status-chip"><span id="statusDot" class="dot"></span><strong id="statusText">连接中</strong></span>
+      <button id="teleopStatusBtn" class="status-chip status-action" type="button" aria-expanded="false" title="人工接管机器狗"><span>遥控</span><strong id="teleopTopStatus">未接管</strong></button>
+      <button id="batteryStatusBtn" class="status-chip status-action" type="button" aria-expanded="false" title="查看电池状态并启动一键充电"><span>电量</span><strong id="battery">-</strong></button>
+      <button id="localizationStatusBtn" class="status-chip status-action" type="button" aria-expanded="false"><span>定位</span><strong id="localization">-</strong></button>
+      <button id="preflightStatusBtn" class="status-chip status-action" type="button" aria-expanded="false" title="查看基础自检结果"><span>自检</span><strong id="preflightTopStatus">尚未自检</strong></button>
+      <button id="taskStatusBtn" class="status-chip status-action" type="button" aria-expanded="false"><span>任务</span><strong id="taskTopStatus">空闲</strong></button>
+      <button id="radarStatusBtn" class="status-chip status-action" type="button" aria-expanded="false" title="查看雷达状态并手动启动扫描"><span>雷达</span><strong id="radarTopStatus">等待</strong></button>
+      <button id="recordingStatusBtn" class="status-chip status-action" type="button" aria-expanded="false"><span>录包</span><strong id="recordingTopStatus">未录制</strong></button>
+    </div>
+  </header>
+
+  <section id="batteryStatusPopover" class="status-popover" hidden>
+    <div class="status-popover-head"><strong>电池状态</strong><button id="closeBatteryStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="batteryStatusSummary" class="compact-status">等待电池数据</div>
+    <div id="batteryStatusDetail" class="battery-detail">等待电池详细数据</div>
+    <div class="actions"><button id="oneKeyChargeBtn" class="primary" type="button">一键充电</button><button id="refreshBatteryBtn" type="button">刷新</button></div>
+    <div class="small">一键充电会执行当前地图中的充电点任务，需先保存且只能有一个充电点。</div>
+  </section>
+
+  <section id="mapStatusPopover" class="status-popover status-popover-map" hidden>
+    <div class="status-popover-head map-popover-head">
+      <div>
+        <div class="map-popover-title"><strong>地图</strong><span id="mapDddmrMapAssetsStatus" class="tag warn">等待</span></div>
+        <div id="mapStatusDetail" class="map-current-summary">等待当前地图</div>
+      </div>
+      <div class="map-popover-actions">
+        <button id="mapDddmrRefreshAssetsBtn" type="button">刷新</button>
+        <button id="closeMapStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button>
+      </div>
+    </div>
+    <div id="mapDddmrAssetWorkspace" class="map-asset-list">等待地图。</div>
+  </section>
+
+  <section id="localizationStatusPopover" class="status-popover status-popover-wide" hidden>
+    <div class="status-popover-head"><strong>重定位</strong><button id="closeLocalizationStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div class="row"><label>坐标 X/Y</label><input id="locXY" placeholder="在地图上拖拽取点" /></div>
+    <div class="row"><label>朝向(rad)</label><input id="locYaw" value="0.0" /></div>
+    <div class="actions"><button class="primary" id="sendInitialPoseBtn">执行重定位</button><button id="useRobotPoseForLocBtn">使用当前位姿</button></div>
+    <label class="checkline"><input id="scanOverlayToggle" type="checkbox" checked /><span id="scanOverlayToggleLabel">显示实时激光轮廓</span></label>
+    <div class="small" id="scanOverlayStatus">等待近场轮廓数据</div>
+    <div id="localizationStatus" class="preflight-summary warn">等待定位状态</div>
+    <div id="localizeLog" class="compact-status">打开定位后，在地图上拖拽设置位置和朝向。</div>
+  </section>
+
+  <section id="preflightStatusPopover" class="status-popover status-popover-wide" hidden>
+    <div class="status-popover-head"><strong>基础自检</strong><button id="closePreflightStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="preflightSummary" class="preflight-summary warn">尚未自检</div>
+    <div id="preflightCounts" class="preflight-counts" aria-live="polite"></div>
+    <div id="preflightItems" class="preflight-items" aria-live="polite"><div class="small">尚未自检。</div></div>
+    <div class="actions"><button class="primary" id="runPreflightBtn" type="button">重新自检</button><button id="refreshPreflightBtn" type="button">刷新结果</button></div>
+  </section>
+  <section id="radarStatusPopover" class="status-popover status-popover-wide" hidden>
+    <div class="status-popover-head"><strong>雷达状态</strong><button id="closeRadarStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="radarStatusSummary" class="radar-box">等待雷达状态</div>
+    <div class="row"><label>手动模式</label><select id="radarManualMode"><option value="measuring">实测实量</option><option value="modeling">点云建模</option><option value="both">实测实量 + 点云建模</option></select></div>
+    <div class="actions"><button id="radarManualScanBtn" class="primary" type="button">手动启动扫描</button><button id="refreshRadarStatusBtn" type="button">刷新状态</button></div>
+    <div class="small">手动扫描使用机器狗当前已确认位姿；导航任务执行中或雷达已有扫描时不会重复启动。</div>
+  </section>
+
+  <section id="recordingStatusPopover" class="status-popover status-popover-wide" hidden>
+    <div class="status-popover-head"><strong>ROS 录包管理</strong><button id="closeRecordingStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div class="row"><label>最长时间(s)</label><input id="recordingDuration" value="300" /></div>
+    <div class="row"><label>名称</label><input id="recordingPrefix" placeholder="留空自动命名" autocomplete="off" /></div>
+    <div class="actions"><button class="primary" id="startRecordingBtn">开始录包</button><button id="stopRecordingBtn">停止录包</button></div>
+    <div id="recordingStatus" class="compact-status">未开始</div>
+    <div class="recording-list-head"><strong>已保存录包</strong><button id="refreshRecordingsBtn" type="button">刷新</button></div>
+    <div id="recordingList" class="recording-list" aria-live="polite"><div class="small">正在读取录包列表...</div></div>
+  </section>
+  <section id="taskStatusPopover" class="status-popover status-popover-wide" hidden>
+    <div class="status-popover-head"><strong>任务进度</strong><button id="closeTaskStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="taskExecutionFlow" class="task-execution-flow"><div class="small">暂无执行任务</div></div>
+    <div class="actions">
+      <button class="danger" id="stopTaskBtn">停止当前任务</button>
+      <button class="danger" id="resetTaskSessionBtn" title="停止残留目标、发送零速度并清理导航会话和代价地图">清理导航会话</button>
+    </div>
+  </section>
+  <section id="teleopStatusPopover" class="status-popover status-popover-teleop" hidden>
+    <div class="status-popover-head"><strong>人工遥控</strong><button id="closeTeleopStatusBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="teleopStatusSummary" class="compact-status">等待速度仲裁器</div>
+    <div class="teleop-pad" aria-label="机器狗遥控方向键">
+      <button class="teleop-control" type="button" data-teleop-direction="rotate_left" title="向左旋转" aria-label="向左旋转" disabled>↶</button>
+      <button class="teleop-control" type="button" data-teleop-direction="forward" title="向前" aria-label="向前" disabled>↑</button>
+      <button class="teleop-control" type="button" data-teleop-direction="rotate_right" title="向右旋转" aria-label="向右旋转" disabled>↷</button>
+      <button class="teleop-control" type="button" data-teleop-direction="left" title="向左横移" aria-label="向左横移" disabled>←</button>
+      <button id="teleopZeroBtn" class="teleop-control teleop-stop" type="button" title="零速停止" aria-label="零速停止" disabled>■</button>
+      <button class="teleop-control" type="button" data-teleop-direction="right" title="向右横移" aria-label="向右横移" disabled>→</button>
+      <span></span>
+      <button class="teleop-control" type="button" data-teleop-direction="backward" title="后退" aria-label="后退" disabled>↓</button>
+      <span></span>
+    </div>
+    <div id="teleopLimits" class="small"></div>
+    <div class="teleop-action-row"><button id="teleopLieBtn" type="button" data-teleop-posture-action="lie" disabled>趴下</button><button id="teleopStandBtn" type="button" data-teleop-posture-action="stand" disabled>起立</button><button id="teleopSoftStopBtn" class="danger" type="button">软急停</button></div>
+    <div class="teleop-action-row teleop-gait-row"><span class="teleop-gait-label">步态</span><button id="teleopGaitFlatBtn" type="button" data-teleop-gait="flat" title="切换平地步态" disabled>平地</button><button id="teleopGaitStairBtn" type="button" data-teleop-gait="stairs" title="切换楼梯步态，可遥控上下楼梯" disabled>楼梯</button><span id="teleopGaitStatus" class="small">当前：默认</span></div>
+    <div class="actions"><button id="acquireTeleopBtn" class="primary" type="button">人工接管</button><button id="releaseTeleopBtn" type="button" disabled>结束接管</button></div>
+  </section>
+  <main>
+    <section class="map-wrap">
+      <div class="map-toolbar">
+        <span class="map-toolbar-left"><button id="mapStatusBtn" class="map-toolbar-map-button status-action" type="button" aria-expanded="false" title="切换当前空间地图"><strong id="mapTitle">等待空间地图</strong><span id="mapMeta">-</span><span class="map-toolbar-map-caret" aria-hidden="true">⌄</span></button></span>
+        <span class="map-tools">
+          <button id="zoomOutBtn" title="缩小视图">-</button>
+          <span id="zoomReadout" class="zoom-readout">100%</span>
+          <button id="zoomInBtn" title="放大视图">+</button>
+          <button id="mapViewModeBtn" class="mode" title="切换三维斜视点云/俯视操作图">3D视角</button>
+          <button id="panModeBtn" title="开启后拖动空间视图，不会标点">平移</button>
+          <button id="fitMapBtn" title="恢复全局适配">适配</button>
+          <button id="centerRobotBtn" title="把机器人位置移动到视图中心">居中机器人</button>
+          <button id="followRobotBtn" title="任务执行时自动跟随机器人">跟随</button>
+        </span>
+      </div>
+      <div class="canvas-box">
+        <canvas id="mapCanvas" aria-label="三维点云地图视图"></canvas>
+        <div id="sliceBar" class="slice-bar" style="display:none" title="俯视图只显示当前楼层切片；多层大地图按楼层页签切换">
+          <span id="floorTabs" class="floor-tabs" style="display:none"></span>
+          <button id="sliceDownBtn" type="button" title="切到下一层">↓层</button>
+          <input id="sliceZSlider" type="range" aria-label="层高切片" />
+          <button id="sliceUpBtn" type="button" title="切到上一层">↑层</button>
+          <span id="sliceZReadout" class="slice-readout">层高 -</span>
+          <button id="sliceAutoBtn" type="button" title="回到主层（自动）">自动</button>
+        </div>
+        <div id="cursor" class="crosshair">拖拽旋转，滚轮缩放</div>
+      </div>
+    </section>
+    <aside class="side">
+      <nav class="tabs">
+        <button class="tab active" data-tab="mapping">建图</button>
+        <button class="tab" data-tab="marks">标点</button>
+        <button class="tab" data-tab="tasks">任务</button>
+        <button class="tab" data-tab="detect">检测</button>
+      </nav>
+      <div class="content">
+        <section id="tab-mapping" class="panel active">
+          <div class="section">
+            <h2>建图</h2>
+            <div class="row">
+              <label>项目名称</label>
+              <input id="projectName" placeholder="输入项目名称" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>建筑/区域</label>
+              <input id="buildingName" placeholder="输入建筑或区域" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>地图名称</label>
+              <input id="mappingMapName" placeholder="留空按 建筑/区域+楼层+时间 自动生成" autocomplete="off" />
+            </div>
+            <input id="mappingMode" type="hidden" value="single" />
+            <input id="mappingFloors" type="hidden" />
+            <div class="actions mapping-actions">
+              <button class="primary" id="startMappingBtn" title="开始建图">开始建图</button>
+              <button id="finishMappingBtn">结束建图</button>
+            </div>
+            <div id="mappingRuntimeStatus" class="compact-status warn">建图运行环境待检查</div>
+            <div id="mappingInlineProgress" class="mapping-inline-progress" hidden></div>
+            <div id="mappingFloorSteps" class="mapping-floor-steps" hidden></div>
+          </div>
+        </section>
+
+        <section id="tab-marks" class="panel">
+          <div class="section">
+            <h2>空间标点</h2>
+            <div class="row">
+              <label>点位类型</label>
+              <select id="markType">
+                <option value="patrol">任务点</option>
+                <option value="transition">过渡点</option>
+                <option value="charge">充电点</option>
+                <option value="stair_entry">爬楼梯点</option>
+                <option value="stair_exit">出楼梯点</option>
+                <option value="stair_switch">楼层切换点</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>楼层</label>
+              <select id="markFloor" disabled></select>
+            </div>
+            <div class="row">
+              <label>名称</label>
+              <input id="markLabel" placeholder="例如 20层东区2008房间" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>楼栋</label>
+              <input id="markBuilding" placeholder="例如 3栋" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>单元</label>
+              <input id="markUnit" placeholder="例如 1单元" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>户号</label>
+              <input id="markHouse" placeholder="例如 2008户" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>区域</label>
+              <input id="markArea" placeholder="例如 东区、核心筒、样板段" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>房间/部位</label>
+              <input id="markRoom" placeholder="例如 2008房间、西侧走廊" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>结果前缀</label>
+              <input id="markResultPrefix" placeholder="留空自动生成昂锐雷达结果文件名前缀" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>扫描点</label>
+              <input id="markScanPoint" placeholder="例如 P01、客厅东侧点" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>雷达扫描</label>
+              <select id="markRadarPlan">
+                <option value="none" selected>不触发雷达</option>
+                <option value="measuring">仅实测实量</option>
+                <option value="modeling">仅点云建模</option>
+                <option value="both">实测实量 + 点云建模</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>空间取点</label>
+              <output id="markPoseSummary" class="pose-readout">未取点</output>
+            </div>
+            <div class="row">
+              <label>高度 Z(m)</label>
+              <input id="markZ" value="0.0" inputmode="decimal" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label>停留(s)</label>
+              <input id="markDwell" value="5.0" />
+            </div>
+            <div class="row">
+              <label>步态</label>
+              <select id="markGait">
+                <option value="12">平地敏捷（12）</option>
+                <option value="14">爬楼梯（14）</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>速度</label>
+              <select id="markSpeed">
+                <option value="1">低速（1）</option>
+                <option value="2">高速（2）</option>
+              </select>
+            </div>
+            <div class="actions">
+              <button class="primary" id="saveMarkBtn">保存点位</button>
+              <button id="cancelEditMarkBtn" hidden>取消修改</button>
+              <button id="useRobotPoseBtn">使用当前机器人位姿</button>
+            </div>
+          </div>
+          <div class="section">
+            <h2>当前地图点位</h2>
+            <div class="collection-toolbar">
+              <input id="annotationSearch" type="search" placeholder="搜索名称、楼层、房间或扫描点" aria-label="搜索点位" />
+              <span id="annotationCount" class="collection-count">0</span>
+            </div>
+            <div id="annotationList" class="list bounded-list"></div>
+            <div id="annotationPager" class="collection-pager"></div>
+          </div>
+        </section>
+
+        <section id="tab-tasks" class="panel">
+          <div class="section">
+            <h2>任务编排</h2>
+            <div class="row">
+              <label>任务名称</label>
+              <input id="taskName" placeholder="留空自动命名" autocomplete="off" />
+            </div>
+            <div class="collection-toolbar">
+              <input id="taskPointSearch" type="search" placeholder="搜索可选点位" aria-label="搜索可选点位" />
+              <span id="taskPointCount" class="collection-count">0</span>
+            </div>
+            <div id="taskPointList" class="ordered-composer">请先选择地图并标点</div>
+            <div class="actions">
+              <button class="primary" id="createTaskBtn">生成任务</button>
+              <button id="reloadTasksBtn">刷新任务</button>
+            </div>
+            <div id="multiFloorSummary" class="multi-floor-summary">正在读取空间任务配置</div>
+          </div>
+          <div class="section">
+            <h2>任务列表</h2>
+            <div class="collection-toolbar">
+              <input id="taskSearch" type="search" placeholder="搜索任务或点位" aria-label="搜索任务" />
+              <span id="taskCount" class="collection-count">0</span>
+            </div>
+            <div id="taskList" class="list bounded-list"></div>
+            <div id="taskPager" class="collection-pager"></div>
+          </div>
+        </section>
+
+        <section id="tab-detect" class="panel">
+          <div class="section">
+            <h2>实时视频</h2>
+            <div class="video-grid">
+              <div class="video-card"><div class="video-head"><strong>前摄像头</strong><span class="video-actions"><label class="video-yolo-toggle" title="先打开前摄像头，再启用 YOLO"><input id="yoloEnabledToggle" type="checkbox" disabled /><span id="yoloToggleLabel">YOLO</span></label><button id="frontVideoBtn" class="mini-btn" type="button" data-video-camera="front">打开</button></span></div><div class="video-stage"><video id="frontVideo" data-src="/video1/index.m3u8" title="前摄像头画面" muted playsinline autoplay></video><canvas id="frontYoloOverlay" aria-hidden="true"></canvas></div><div id="yoloStatus" class="video-inspection-status">YOLO 已关闭 / 请先打开视频</div><div id="detections" class="detection-results" hidden></div></div>
+              <div class="video-card"><div class="video-head"><strong>后摄像头</strong><button id="rearVideoBtn" class="mini-btn" type="button" data-video-camera="rear">打开</button></div><div class="video-stage"><video id="rearVideo" data-src="/video2/index.m3u8" title="后摄像头画面" muted playsinline autoplay></video></div></div>
+            </div>
+          </div>
+          <div class="section">
+            <h2>雷达测量结果</h2>
+            <div class="collection-toolbar radar-result-toolbar">
+              <input id="radarResultSearch" type="search" placeholder="搜索任务、房间、点位或指标" aria-label="搜索雷达测量结果" />
+              <select id="radarResultMode" aria-label="筛选雷达测量模式"><option value="">全部模式</option><option value="measuring">实测实量</option><option value="modeling">点云建模</option></select>
+              <button id="refreshRadarResultsBtn" type="button">刷新</button><span id="radarResultCount" class="collection-count">0</span>
+            </div>
+            <div id="radarResultList" class="radar-result-list">等待结果</div>
+            <div id="radarResultPager" class="collection-pager"></div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="operationFeedbackDialog" class="operation-dialog feedback-dialog">
+    <div class="operation-dialog-head"><div><div id="operationFeedbackTitle" class="operation-dialog-title">操作结果</div><div id="operationFeedbackContext" class="operation-dialog-context"></div></div><button id="closeOperationFeedbackBtn" class="icon-button" type="button" title="关闭" aria-label="关闭">×</button></div>
+    <div id="operationFeedbackMessage" class="operation-message"></div>
+    <div class="dialog-actions"><button id="confirmOperationFeedbackBtn" class="primary" type="button">确定</button></div>
+  </dialog>
+
+  <dialog id="teleopConfirmDialog" class="operation-dialog feedback-dialog">
+    <div class="operation-dialog-head"><div><div id="teleopConfirmTitle" class="operation-dialog-title">确认遥控动作</div><div id="teleopConfirmContext" class="operation-dialog-context"></div></div><button id="closeTeleopConfirmBtn" class="icon-button" type="button" title="取消" aria-label="取消">×</button></div>
+    <div id="teleopConfirmMessage" class="operation-message"></div>
+    <div class="dialog-actions"><button id="cancelTeleopConfirmBtn" type="button">取消</button><button id="confirmTeleopConfirmBtn" class="primary" type="button">确认</button></div>
+  </dialog>
+
+  <script src="/static/dashboard.js?v=20260831-density-fix-2"></script>
+
+</body>
+</html>

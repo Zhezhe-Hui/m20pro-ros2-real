@@ -1,0 +1,57 @@
+# M20Pro real autostart configuration.
+# move: full real system with motion-control chain enabled and DDDMR field-test defaults.
+# shadow: full real system for observation only; web task dispatch will not move the robot.
+M20PRO_REAL_MODE=move
+M20PRO_WS=/home/user/m20pro_real_ros2_ws_v4
+M20PRO_WORKSPACE_MODE=3d
+M20PRO_2D_RVIZ=false
+M20PRO_FASTDDS_PROFILE=project_udp
+M20PRO_CLEAN_STALE_FASTDDS_SHM=1
+M20PRO_SCAN_TOPIC=/scan
+M20PRO_NAVIGATION_BACKEND=dddmr_3d
+M20PRO_ENABLE_DDDMR_BRIDGE=true
+M20PRO_ENABLE_DDDMR_RUNTIME=true
+M20PRO_DDDMR_RUNTIME_BACKEND=official
+M20PRO_DDDMR_FIELD_TEST_FLAT_MAP=false
+M20PRO_DDDMR_FIELD_TEST_FLAT_MAP_EXTENT_M=2.0
+M20PRO_DDDMR_FIELD_TEST_FLAT_MAP_SPACING_M=0.25
+M20PRO_DDDMR_FIELD_TEST_FLAT_MAP_HEIGHT_M=0.0
+M20PRO_DDDMR_FIELD_TEST_MODE_SCRIPT=/home/user/m20pro_real_ros2_ws_v4/scripts/104_dddmr_field_test_mode.sh
+M20PRO_DDDMR_MAPPING_HOST=localhost
+M20PRO_DDDMR_MAPPING_USER=user
+M20PRO_DDDMR_MAPPING_START_COMMAND='/home/user/m20pro_real_ros2_ws_v4/scripts/lightning_raw_mapping_control.sh start {floor}'
+M20PRO_DDDMR_MAPPING_FINISH_COMMAND='/home/user/m20pro_real_ros2_ws_v4/scripts/lightning_raw_mapping_control.sh finish {floor}'
+M20PRO_DDDMR_MAPPING_CANCEL_COMMAND='/home/user/m20pro_real_ros2_ws_v4/scripts/lightning_raw_mapping_control.sh cancel {floor}'
+M20PRO_DDDMR_MAPPING_STATUS_COMMAND='/home/user/m20pro_real_ros2_ws_v4/scripts/lightning_raw_mapping_control.sh status {floor}'
+# 104 is an ARM/RK3588 Foxy host.  Build this workspace natively on 104;
+# never copy the development workstation's Humble/x86 install tree here.
+M20PRO_DDDMR_RUNTIME_DISTRO=foxy
+M20PRO_DDDMR_RUNTIME_WS=/home/user/m20pro_real_ros2_ws_v4
+M20PRO_DDDMR_RUNTIME_SETUP=/home/user/m20pro_real_ros2_ws_v4/install/setup.bash
+M20PRO_DDDMR_MAPPING_PACKAGE=m20pro_bringup
+M20PRO_DDDMR_MAPPING_LAUNCH=m20pro_lightning_mapping.launch.py
+M20PRO_DDDMR_ALGORITHM_PACKAGE=lightning
+M20PRO_LIGHTNING_MAPPING_WORK_DIR=/root/.m20pro_lightning_mapping/work
+M20PRO_LIGHTNING_GROUND_HEIGHT_M=0.35
+M20PRO_LIGHTNING_GROUND_LOWER_MARGIN_M=0.10
+M20PRO_ENABLE_INSPECTION=false
+M20PRO_INSPECTION_BACKEND=auto
+M20PRO_INSPECTION_SOURCE_TYPE=rtsp
+M20PRO_INSPECTION_RTSP_URL=rtsp://10.21.31.103:8554/video1
+M20PRO_INSPECTION_CAMERA_NAME=front_wide
+M20PRO_INSPECTION_MODEL_PATH=/home/user/m20pro_real_ros2_ws_v4/install/m20pro_inspection/share/m20pro_inspection/models/best.pt
+M20PRO_INSPECTION_CLASS_NAMES_PATH=/home/user/m20pro_real_ros2_ws_v4/install/m20pro_inspection/share/m20pro_inspection/models/labels_zh.txt
+M20PRO_ENABLE_DDDMR_SOCKET_BRIDGE=true
+M20PRO_DDDMR_SOCKET_CLOUD_PATH=/run/m20pro/dddmr_edge_cloud.sock
+M20PRO_DDDMR_SOCKET_CLOUD_TOPIC=/m20pro/dddmr/edge_cloud_socket
+M20PRO_ENABLE_RADAR_INSPECTION=false
+M20PRO_RADAR_BACKEND=dry_run
+M20PRO_RADAR_SCAN_MODE=measuring
+M20PRO_RADAR_DEVICE_URL=http://192.168.107.72:8080
+M20PRO_RADAR_OUTPUT_DIR=/home/user/m20pro_radar_results
+M20PRO_RADAR_RELEASE_ON_ANALYSIS=true
+M20PRO_RADAR_START_RETRY_TIMEOUT_S=120.0
+M20PRO_RADAR_START_RETRY_INTERVAL_S=5.0
+M20PRO_RADAR_RESULT_RETRY_COUNT=5
+M20PRO_RADAR_RESULT_RETRY_INTERVAL_S=2.0
+M20PRO_RADAR_QUERY_ERROR_TIMEOUT_S=120.0

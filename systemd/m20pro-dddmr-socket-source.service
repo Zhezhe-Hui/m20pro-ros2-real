@@ -1,0 +1,19 @@
+[Unit]
+Description=M20Pro DrDDS edge-cloud socket source
+BindsTo=m20pro-real.service
+After=m20pro-real.service
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/default/m20pro-real
+ExecCondition=/bin/bash -c 'case "${M20PRO_WORKSPACE_MODE:-3d}" in 3d) exit 0;; *) exit 1;; esac'
+ExecCondition=/bin/bash -c 'case "${M20PRO_ENABLE_DDDMR_SOCKET_BRIDGE:-true}" in true|TRUE|1|yes|YES|on|ON) exit 0;; *) exit 1;; esac'
+# DrDDS must retain the robot's original FastDDS profile. The main ROS stack
+# may use the project UDP profile without changing this raw vendor subscriber.
+ExecStart=/bin/bash -lc 'source /opt/robot/scripts/setup_ros2.sh && export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/robot/fastdds.xml && exec /usr/local/lib/m20pro/drdds_edge_cloud_socket_source "${M20PRO_DDDMR_SOCKET_SOURCE_TOPIC:-/m20pro/edge_cloud}" "${M20PRO_DDDMR_SOCKET_CLOUD_PATH:-/run/m20pro/dddmr_edge_cloud.sock}" 0 0 rt'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=m20pro-real.service

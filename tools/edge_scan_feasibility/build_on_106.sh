@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUT_DIR="${1:-/tmp/m20pro_edge_scan_feasibility}"
+
+mkdir -p "${OUT_DIR}"
+
+cxx_flags=(
+  -std=c++17
+  -O2
+  -DGEN_API_VER=2
+  -I/usr/local/include
+  -I/usr/local/include/dridl
+)
+
+link_flags=(
+  -L/usr/local/lib
+  -Wl,-rpath,/usr/local/lib
+  -ldrdds
+  -lfastcdr
+  -lfastrtps
+  -lfoonathan_memory-0.7.3
+  -lpthread
+)
+
+g++ "${cxx_flags[@]}" \
+  "${SCRIPT_DIR}/drdds_lidar_probe.cpp" \
+  -o "${OUT_DIR}/drdds_lidar_probe" \
+  "${link_flags[@]}"
+
+g++ "${cxx_flags[@]}" \
+  "${SCRIPT_DIR}/drdds_edge_scan_demo.cpp" \
+  -o "${OUT_DIR}/m20pro_edge_scan" \
+  "${link_flags[@]}"
+
+g++ "${cxx_flags[@]}" \
+  "${SCRIPT_DIR}/drdds_edge_cloud_socket_source.cpp" \
+  -o "${OUT_DIR}/drdds_edge_cloud_socket_source" \
+  "${link_flags[@]}"
+
+g++ "${cxx_flags[@]}" \
+  "${SCRIPT_DIR}/drdds_dense_passthrough.cpp" \
+  -o "${OUT_DIR}/m20pro_dense_passthrough" \
+  "${link_flags[@]}"
+
+echo "Built ${OUT_DIR}/drdds_lidar_probe"
+echo "Built ${OUT_DIR}/m20pro_edge_scan"
+echo "Built ${OUT_DIR}/drdds_edge_cloud_socket_source"
+echo "Built ${OUT_DIR}/m20pro_dense_passthrough"
+echo "Try: ${OUT_DIR}/drdds_lidar_probe /LIDAR/POINTS 0 0 rt 8"
+echo "The binary requires the complete generated field profile; install it with scripts/106_enable_edge_scan_service.sh."

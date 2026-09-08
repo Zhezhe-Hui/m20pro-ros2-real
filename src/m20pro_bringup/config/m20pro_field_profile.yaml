@@ -1,0 +1,122 @@
+# M20Pro 现场参数唯一配置源。
+#
+# 只在上位机修改本文件，修改后依次执行：
+#   ./scripts/apply_field_profile.sh --check
+#   ./scripts/apply_field_profile.sh
+#
+# 不要直接修改 104/106 上自动生成的 /etc 配置文件。
+# 配置只管理当前唯一运行链路；不保留旧楼梯感知和旧爬楼参数。
+schema_version: 6                 # 配置结构版本，程序使用，禁止自行修改
+profile_name: default_field       # 配置名称，仅允许 ASCII 字母、数字、点、下划线和短横线
+
+# 点云转二维激光参数（运行在 106）
+scan:
+  height_min_m: -0.25             # 参与投影的最低高度，单位 m，相对机器狗基座
+  height_max_m: 0.60              # 参与投影的最高高度，单位 m，必须大于最低高度
+  publish_hz: 4.0                 # 106 发布 /scan 的最高频率，单位 Hz
+  bin_hold_s: 0.75                # 激光角度栅格保留最近有效点的时间，单位 s
+  angle_increment_rad: 0.0174533  # 二维激光角分辨率，单位 rad，当前约为 1 度
+  range_min_m: 0.20               # 最小有效测距，单位 m
+  range_max_m: 10.0               # 最大有效测距，单位 m，必须大于最小测距
+
+# DDDMR 三维输入参数（同一条 106 DrDDS 进程，独立于 /scan 过滤）。
+# 保留真实有限 x/y/z，供 104 适配器和 DDDMR 局部规划使用。
+dddmr:
+  edge_cloud:
+    height_min_m: -1.50            # 三维点云最低高度，单位 m
+    height_max_m: 2.50             # 三维点云最高高度，单位 m
+    range_min_m: 0.20              # 三维点云最小平面距离，单位 m
+    range_max_m: 30.0              # 三维点云最大平面距离，单位 m
+    publish_hz: 10.0               # 三维点云发布上限，单位 Hz
+    hold_s: 0.25                   # 碎片点云滚动保留时间，单位 s
+    max_points: 20000              # 正式 DDDMR 感知输入上限；仍高于 MCL 的最小点数门限
+
+# 跨楼层路线、楼梯运动与切图参数。
+stair_transition:
+  motion_speed_mps: 0.12          # 楼梯直行速度，单位 m/s；上楼为正向，下楼自动后退
+  motion_command_hz: 10.0         # 楼梯速度指令发布频率，单位 Hz
+  motion_pose_timeout_s: 1.50     # 楼梯运动期间原厂地图位姿最大中断时间，单位 s
+  gait_settle_s: 1.0              # 原厂步态切换后开始楼梯运动前的等待时间，单位 s
+  connector_stage_timeout_s: 180.0 # 每个连接边阶段的最大执行时间，单位 s
+  floor_switch_timeout_s: 30.0    # 106 原厂目标地图激活命令的最大等待时间，单位 s
+  platform_position_tolerance_m: 0.50 # 跨层共享平台重定位的位置容差，单位 m
+  platform_yaw_tolerance_rad: 0.45 # 跨层共享平台重定位的朝向容差，单位 rad
+  post_switch_goal_delay_s: 0.2   # floor_manager确认目标层后的最小发目标间隔，单位 s
+  duplicate_goal_tolerance_m: 0.08 # 两目标位置差小于该值时视为重复，单位 m
+  duplicate_goal_yaw_tolerance_rad: 0.12 # 两目标朝向差小于该值时视为重复，单位 rad
+
+# Nav2 导航参数（插件、话题、坐标系、footprint 和行为树不在现场配置中修改）
+navigation:
+  # DWB 控制器与恢复动作；减速度在本文件填写正数幅值，运行时自动转为 DWB 负值。
+  controller:
+    frequency_hz: 10.0            # 局部控制循环频率，单位 Hz；越高越实时但 CPU 开销越大
+    max_linear_speed_mps: 0.45    # 最大前进速度，单位 m/s
+    max_angular_speed_radps: 0.75 # 最大旋转速度，单位 rad/s
+    min_angular_speed_radps: 0.35 # 纯旋转最低有效角速度，单位 rad/s；带线速度时不限制角速度
+    linear_acceleration_limit_mps2: 2.20 # 线加速度上限，单位 m/s^2
+    angular_acceleration_limit_radps2: 2.00 # 角加速度上限，单位 rad/s^2
+    linear_deceleration_limit_mps2: 2.20 # 线减速度正数幅值，单位 m/s^2
+    angular_deceleration_limit_radps2: 2.00 # 角减速度正数幅值，单位 rad/s^2
+    stopped_linear_speed_mps: 0.12 # 低于该线速度视为停止，单位 m/s；必须小于最大前进速度
+    recovery_min_angular_speed_radps: 0.35 # 平地旋转恢复的最小角速度，单位 rad/s
+    recovery_simulation_time_s: 2.0 # 恢复动作向前模拟检查时间，单位 s
+  # 到点精度；位置和朝向分别判断，收紧朝向不会同步收紧位置。
+  goal:
+    xy_tolerance_m: 0.35          # 目标点平面位置容差，单位 m
+    yaw_tolerance_rad: 0.35       # 目标点最终朝向容差，单位 rad，恢复现场稳定口径，约 20 度
+  # 卡住判断；Foxy 只按平移距离判断进度，原地修正朝向时不要把半径设得过大。
+  progress:
+    required_movement_radius_m: 0.10 # 在允许时间内至少应移动的距离，单位 m；不得大于到点位置容差
+    movement_time_allowance_s: 12.0 # 达到最小移动距离所允许的时间，单位 s
+  # DWB 轨迹预测与采样；采样数越大，每个控制周期的 CPU 开销越高。
+  local_planner:
+    simulation_time_s: 1.50       # 每条候选轨迹向前模拟的时间，单位 s
+    linear_velocity_samples: 12   # 每周期采样的线速度数量，必须为整数
+    angular_velocity_samples: 20  # 每周期采样的角速度数量，必须为整数
+    obstacle_critic_scale: 0.05   # 现场稳定基线：保留足迹安全约束，但不让膨胀区代价压制可行轨迹
+  # 局部/全局代价地图；发布频率不得高于更新频率，清障距离不得小于障碍标记距离。
+  costmap:
+    local_update_frequency_hz: 8.0 # 局部代价地图内部更新频率，单位 Hz
+    local_publish_frequency_hz: 2.0 # 局部代价地图对外发布频率，单位 Hz
+    global_update_frequency_hz: 1.0 # 全局代价地图内部更新频率，单位 Hz
+    global_publish_frequency_hz: 0.5 # 全局代价地图对外发布频率，单位 Hz
+    obstacle_range_m: 3.0         # 激光用于标记障碍物的最远距离，单位 m
+    raytrace_range_m: 3.5         # 激光用于清除旧障碍物的最远距离，单位 m
+    observation_persistence_s: 0.30 # 现场稳定基线：障碍观测保留时间，单位 s
+    inflation_radius_m: 0.62      # 障碍物膨胀半径，单位 m，局部与全局地图共用
+    inflation_cost_scaling_factor: 4.0 # 膨胀代价衰减系数；越大表示代价随距离下降越快
+  # 全局路径规划器参数
+  global_planner:
+    expected_frequency_hz: 1.0    # 期望全局规划频率，单位 Hz
+    goal_tolerance_m: 0.50        # 目标被占用时搜索附近可达点的容差，单位 m；不得小于到点位置容差
+
+# 网页人工接管参数；遥控与 Nav2 经速度仲裁后才能进入 103 运动链路。
+teleoperation:
+  watchdog_rate_hz: 20.0          # 速度仲裁器检查指令超时的频率，单位 Hz
+  command_timeout_s: 1.00         # 遥控指令看门狗：超过该时间未收到新指令即零速停车，单位 s；合同允许 0.15–1.0，2026-08-21 取上限以吸收 WiFi/浏览器节流抖动
+  navigation_timeout_s: 0.60      # Nav2 速度样本超过该时间立即零速停车，单位 s
+  max_forward_speed_mps: 0.40     # 遥控最大前进速度，单位 m/s；2026-08-21 应用户要求 0.18→0.40（合同上限内，与 demo_test 一致）
+  max_reverse_speed_mps: 0.12     # 遥控最大后退速度，单位 m/s
+  max_lateral_speed_mps: 0.30     # 遥控最大横移速度，单位 m/s；对应原厂横移归一化指令 0.60
+  max_angular_speed_radps: 0.45   # 遥控最大旋转角速度，单位 rad/s
+
+# 定位稳定性高级参数；现场调整时一次只改一组，并结合 rosbag 验证。
+localization:
+  tf_fallback_max_age_s: 1.0     # 备用 TF 位姿允许的最大年龄，单位 s
+  pose_jump_reject_m: 0.60       # 非重定位状态下单次位置跳变拒绝阈值，单位 m
+  pose_jump_candidate_radius_m: 0.30 # 连续跳变候选之间允许的位置差，单位 m
+  pose_jump_candidate_yaw_tolerance_rad: 0.35 # 连续跳变候选之间允许的朝向差，单位 rad
+  stationary_drift_reject_m: 0.20 # 静止 TF 超过此位置偏差时保持可信锚点并告警，单位 m
+  stationary_drift_reject_yaw_rad: 0.30 # 静止 TF 超过此朝向偏差时保持可信锚点并告警，单位 rad
+  motion_command_hold_s: 1.0     # 最后一条运动命令后仍按“运动中”处理的保持时间，单位 s
+  handle_steer_motion_hold_s: 1.5 # 原厂手柄非零摇杆后仍按“手柄运动中”处理的保持时间，单位 s
+  posture_transition_hold_s: 1.5 # 起立/趴下造成 TF 身体姿态变化时保持地图锚点的时间，单位 s
+  posture_transition_z_delta_m: 0.15 # 判定身体起伏姿态变化的最小 Z 变化，单位 m
+  posture_transition_tilt_delta_rad: 0.20 # 判定身体姿态变化的最小横滚/俯仰变化，单位 rad
+  command_linear_deadband_mps: 0.03 # 判断是否存在有效线速度命令的死区，单位 m/s
+  command_angular_deadband_rad_s: 0.05 # 判断是否存在有效角速度命令的死区，单位 rad/s
+  filter_hold_last_good_s: 1.0   # 异常位姿期间最多保留最近可信位姿的时间，单位 s
+  relocalization_jump_grace_s: 3.0 # 重定位成功后允许大幅位姿变化的宽限时间，单位 s
+  relocalization_jump_grace_radius_m: 1.0 # 重定位宽限期允许的位置变化范围，单位 m
+  odom_rebase_jump_m: 0.60       # 触发 map→odom 连续性重基准的位置跳变量，单位 m
+  odom_rebase_jump_yaw_rad: 0.75 # 触发 map→odom 连续性重基准的朝向跳变量，单位 rad

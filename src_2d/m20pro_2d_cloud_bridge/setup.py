@@ -1,0 +1,25 @@
+from setuptools import setup
+
+package_name = "m20pro_2d_cloud_bridge"
+
+setup(
+    name=package_name,
+    version="0.1.0",
+    packages=[package_name],
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+    ],
+    package_data={package_name: ["static/dashboard.html", "static/dashboard.css", "static/dashboard.js"]},
+    install_requires=["setuptools"],
+    zip_safe=False,
+    maintainer="M20Pro Developer",
+    maintainer_email="user@example.com",
+    description="Independent 2D SLAM/Nav2 web dashboard and I/O bridge for the M20 Pro.",
+    license="Apache-2.0",
+    entry_points={
+        "console_scripts": [
+            "web_dashboard = m20pro_2d_cloud_bridge.web_dashboard_node:main",
+        ],
+    },
+)

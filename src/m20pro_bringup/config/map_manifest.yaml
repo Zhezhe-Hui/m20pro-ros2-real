@@ -1,0 +1,12 @@
+# M20Pro map asset manifest.
+#
+# Only explicitly approved project assets belong here. Runtime maps created or
+# imported on 104 live in the Web archive and are not duplicated in source.
+
+map_set:
+  name: "m20pro_map_library"
+  description: "M20Pro 项目内置地图资产库；默认不预置现场楼层地图。"
+  frame_id: "map"
+  source_note: "业务地图以 104 地图归档为唯一来源，楼层编号必须来自现场建图。"
+
+maps: []

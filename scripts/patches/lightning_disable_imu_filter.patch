@@ -1,0 +1,36 @@
+# 2026-08-23 行走建图发散根因修复 (104: src/lightning-lm-deep-robotics)
+#
+# 现象: 静态建图完美(±1mm), 一走动 LIO 15-17 秒内发散(位姿螺旋飙升,
+#       08-21 16:47 整层会话与 08-23 21:11 会话完全同构)。
+# 根因: 原厂 2026-03 在 imu_processing.hpp 引入的 IMUFilter (imu_filter.h):
+#       - 陀螺 rate limiter 3 rad/s^2: 机器狗行走单步陀螺变化率实测需求
+#         ~6-12 rad/s^2, 被削 2-4 倍 -> 传播姿态动态下系统性滞后;
+#       - 5 点中值 + 3 点滑平均: 附加群延迟;
+#       - 毛刺检测(3σ, σ 慢适应): 行走信号被当毛刺替换(日志可见)。
+#       每 100ms 扫描需 ~2°/12cm 修正与预测对抗(静态为 0.008°/0.4mm),
+#       误差随运动放大 -> 指数发散。静态无信号变化, 滤波不生效, 故静态完美。
+# 修复: 移除 IMUFilter, 原始 IMU 直接进 ESKF 传播/去畸变。噪声由
+#       cov_gyr_/cov_acc_ 过程噪声协方差处理(标准 FAST-LIO2 做法)。
+# 应用位置: 104:/home/user/m20pro_real_ros2_ws_v4/src/lightning-lm-deep-robotics/src/core/lio/imu_processing.hpp
+# 重建: cd /home/user/m20pro_real_ros2_ws_v4 && source /opt/ros/foxy/setup.bash \
+#       && colcon build --packages-select lightning --cmake-args -DCMAKE_BUILD_TYPE=Release
+--- a/src/core/lio/imu_processing.hpp
++++ b/src/core/lio/imu_processing.hpp
+@@ includes
+-#include "core/lio/imu_filter.h"
+@@ class ImuProcess members
+-    IMUFilter filter_;
+@@ UndistortPcl, before forward propagation
+-    for (auto &imu : v_imu) {
+-        auto imu_f = filter_.Filter(*imu);
+-        *imu = imu_f;
+-    }
++    // 2026-08-23 root cause fix (walking divergence): removed vendor IMUFilter
++    // (imu_filter.h). Its gyro rate limiter (3 rad/s^2) and median/moving-average
++    // smoothing lag the real body angular velocity during walking (legged robots
++    // reach ~6-12 rad/s^2 gyro slew per step), so the propagated attitude was
++    // systematically wrong under motion: ~2 deg / 12 cm correction fight every
++    // 100 ms scan, spiraling to full divergence in ~15 s. Static sessions were
++    // unaffected (constant gyro -> limiter inert), which is why every saved map
++    // so far was static-only. ESKF process noise (cov_gyr_/cov_acc_) is the
++    // correct noise handling; raw IMU goes straight into prediction/undistort.
